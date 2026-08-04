@@ -1,0 +1,58 @@
+name: enumlib.jl drop-in
+
+# Proves Enumlib.jl's `enum.x` is a drop-in replacement for the Fortran enum.x:
+# runs pymatgen's OWN, unmodified tests/command_line/test_enumlib_caller.py with
+# the Julia enum.x on PATH. Only enum.x is replaced; makeStr.py is reused.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [enumlib-jl-ci]
+
+jobs:
+  dropin:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this pymatgen-core fork (for the test file)
+        uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install released pymatgen + pytest
+        run: pip install pymatgen pytest
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+
+      - name: Build the Enumlib.jl enum.x (phase9 branch)
+        run: |
+          git clone --depth 1 --branch phase9-pymatgen-dropin \
+            https://github.com/glwhart/Enumlib.jl.git "$HOME/Enumlib.jl"
+          julia --project="$HOME/Enumlib.jl" -e 'using Pkg; Pkg.instantiate()'
+          julia --project="$HOME/Enumlib.jl" -e 'using Enumlib'   # warm precompile + smoke-load
+
+      - name: Put enum.x (Julia) and makeStr.py on PATH
+        run: |
+          mkdir -p "$HOME/bin"
+          printf '#!/bin/bash\nexec julia --project=%s %s/bin/enum.jl "$@"\n' \
+            "$HOME/Enumlib.jl" "$HOME/Enumlib.jl" > "$HOME/bin/enum.x"
+          chmod +x "$HOME/bin/enum.x"
+          git clone --depth 1 https://github.com/msg-byu/enumlib.git "$HOME/enumlib-fortran"
+          cp "$HOME/enumlib-fortran/aux_src/makeStr.py" "$HOME/bin/makeStr.py"
+          chmod +x "$HOME/bin/makeStr.py"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+
+      - name: Fetch pymatgen test fixtures
+        run: |
+          git clone --depth 1 https://github.com/materialsproject/pymatgen-test-files.git \
+            "$HOME/pmg-test-files"
+          echo "PMG_TEST_FILES_DIR=$HOME/pmg-test-files" >> "$GITHUB_ENV"
+
+      - name: Run pymatgen's enumlib suite against the Julia enum.x
+        run: |
+          echo "enum.x     -> $(which enum.x)"
+          echo "makeStr.py -> $(which makeStr.py)"
+          pytest tests/command_line/test_enumlib_caller.py -v -o addopts="" -p no:cacheprovider
