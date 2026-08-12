@@ -6,6 +6,13 @@ makestr.x available in the path. Please download the library at
 https://github.com/msg-byu/enumlib and follow the instructions in the README to
 compile these two executables accordingly.
 
+Alternatively, ``enum.x`` can be provided by Enumlib.jl
+(https://github.com/glwhart/Enumlib.jl), a from-scratch Julia reimplementation of
+enumlib by one of its authors. It is a drop-in replacement: the
+``struct_enum.in`` / ``struct_enum.out`` file contract is unchanged and
+``makeStr.py`` is reused, so only ``enum.x`` is swapped. This module's own test
+suite passes against it.
+
 If you use this module, please cite:
 
     - Gus L. W. Hart and Rodney W. Forcade, "Algorithm for generating derivative
